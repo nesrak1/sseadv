@@ -10,8 +10,10 @@ namespace sseadv
         public string name;
         public int version;
         public Bitmap baseTexture;
+        public Dictionary<int, Bitmap> textures;
         public byte[] rawBytes;
-        public AssetExternal textureExt;
+        //public AssetExternal textureExt;
+        public List<AssetExternal> textureExts;
         public List<TkSpriteDefinition> sprites;
 
         //for listview
@@ -31,9 +33,11 @@ namespace sseadv
         public int height;
         public float xOff;
         public float yOff;
+        public int materialId;
         public float fullWidth;
         public float fullHeight;
         public bool flipped;
+        public Bitmap cropCache;
 
         //for listview
         public override string ToString()

@@ -65,7 +65,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="classes.cs" />
-    <Compile Include="dungeongame.cs" />
     <Compile Include="sceneselect.cs">
       <SubType>Form</SubType>
     </Compile>

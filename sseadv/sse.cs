@@ -41,7 +41,7 @@ namespace sseadv
             InitializeComponent();
 
             onMono = Type.GetType("Mono.Runtime") != null;
-
+            
             if (onMono)
                 TITLE_DEF += " [compat mode]";
 
@@ -153,7 +153,8 @@ namespace sseadv
             if (saveFolder != string.Empty)
             {
                 int counter = 0;
-                foreach (TkSpriteDefinition sprite in activeCollection.sprites)
+                List<TkSpriteDefinition> sortedSpriteList = activeCollection.sprites.OrderBy(s => s.name).ToList();
+                foreach (TkSpriteDefinition sprite in sortedSpriteList)
                 {
                     Bitmap croppedImage = GetBitmap(sprite, false, true, true);
                     croppedImage.Save(Path.Combine(saveFolder, $"{activeCollection.name}_{counter.ToString().PadLeft(3, '0')}.png"));
@@ -193,6 +194,7 @@ namespace sseadv
             {
                 int counter = 0;
                 Bitmap baseTexture = activeCollection.sprites[0].parent.baseTexture;
+                //o boy, hope this is the right size
                 Bitmap canvas = new Bitmap(baseTexture.Width, baseTexture.Height);
                 foreach (TkSpriteDefinition sprite in activeCollection.sprites)
                 {
@@ -201,6 +203,20 @@ namespace sseadv
                     counter++;
                 }
                 canvas.Save(Path.Combine(saveFolder, $"{activeCollection.name}_edit.png"));
+            }
+        }
+
+        private void thisFrameToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (activeCollection == null)
+                return;
+
+            string saveFolder = SelectFolder();
+
+            if (saveFolder != string.Empty && framesList.SelectedItem is TkSpriteDefinition spriteDef)
+            {
+                Bitmap croppedImage = GetBitmap(spriteDef, false, true, true);
+                croppedImage.Save(Path.Combine(saveFolder, $"{spriteDef.name}.png"));
             }
         }
 
@@ -218,7 +234,7 @@ namespace sseadv
                 if (col.baseTexture == null)
                 {
                     Text = TITLE_DEF + " [loading texture...]";
-                    col.baseTexture = GetTexture(col.textureExt);
+                    col.baseTexture = GetTexture(col.textureExts[0]);
                     Text = TITLE_DEF;
                 }
 
@@ -240,13 +256,20 @@ namespace sseadv
             object item = framesList.SelectedItem;
             if (item is TkSpriteDefinition def)
             {
+                int materialId = def.materialId;
                 TkSpriteCollection col = def.parent;
-                if (col.baseTexture == null)
+                if (!col.textures.ContainsKey(materialId) || col.textures[materialId] == null)
                 {
-                    col.baseTexture = GetTexture(col.textureExt);
+                    col.textures[def.materialId] = GetTexture(col.textureExts[materialId]);
                 }
 
-                pictureBox.Image = GetBitmap(def, true, false, false);
+                Bitmap pictureBoxBitmap;
+                if (def.cropCache != null)
+                    pictureBoxBitmap = def.cropCache;
+                else
+                    pictureBoxBitmap = GetBitmap(def, true, false, false);
+
+                pictureBox.Image = pictureBoxBitmap;
             }
         }
 
@@ -261,7 +284,10 @@ namespace sseadv
                 framesList.Items.Clear();
                 foreach (TkSpriteFrame frame in anim.frames)
                 {
-                    framesList.Items.Add(frame.collection.sprites[frame.spriteId]);
+                    if (frame.spriteId < frame.collection.sprites.Count)
+                        framesList.Items.Add(frame.collection.sprites[frame.spriteId]);
+                    else
+                        framesList.Items.Add("[nonexistant sprite]");
                 }
                 frameSlider.Minimum = 0;
                 frameSlider.Maximum = anim.frames.Count - 1;
@@ -276,7 +302,7 @@ namespace sseadv
                 {
                     if (col.baseTexture == null)
                     {
-                        col.baseTexture = GetTexture(col.textureExt);
+                        col.baseTexture = GetTexture(col.textureExts[0]);
                     }
 
                     List<TkSpriteAnimationClip> colAnis = animationClips.Where(a => a.parent.parents.Contains(col)).ToList();
@@ -306,6 +332,8 @@ namespace sseadv
 
                 playingAnimation = true;
                 activeFrame = 0;
+                framesList.SelectedIndex = activeFrame;
+                frameSlider.Value = activeFrame;
                 animationTimer = new Timer()
                 {
                     Interval = (int)(1f / activeAnimation.fps * 1000f)
@@ -333,7 +361,8 @@ namespace sseadv
         private void frameSlider_ValueChanged(object sender, EventArgs e)
         {
             activeFrame = frameSlider.Value;
-            framesList.SelectedIndex = activeFrame;
+            if (framesList.Items.Count > 0)
+                framesList.SelectedIndex = activeFrame;
         }
 
         private void ResetUI()
@@ -416,15 +445,16 @@ namespace sseadv
                 {
                     AssetTypeValueField textures = mbSerialBase.Get("textures");
 
-                    AssetExternal textureExt = new AssetExternal();
-                    int textureWidth = 0;
-                    int textureHeight = 0;
-                    if (textures.childrenCount > 0)
+                    List<AssetExternal> textureExts = new List<AssetExternal>();
+                    List<int> textureWidths = new List<int>();
+                    List<int> textureHeights = new List<int>();
+                    for (int i = 0; i < textures.childrenCount; i++)
                     {
-                        textureExt = am.GetExtAsset(inst, mbSerialBase.Get("textures")[0]);
+                        AssetExternal textureExt = am.GetExtAsset(inst, mbSerialBase.Get("textures")[i]);
                         AssetTypeValueField textureBase = textureExt.instance.GetBaseField();
-                        textureWidth = textureBase.Get("m_Width").GetValue().AsInt();
-                        textureHeight = textureBase.Get("m_Height").GetValue().AsInt();
+                        textureExts.Add(textureExt);
+                        textureWidths.Add(textureBase.Get("m_Width").GetValue().AsInt());
+                        textureHeights.Add(textureBase.Get("m_Height").GetValue().AsInt());
                     }
 
                     TkSpriteCollection collection = new TkSpriteCollection()
@@ -432,7 +462,8 @@ namespace sseadv
                         name = mbSerialBase.Get("spriteCollectionName").GetValue().AsString(),
                         version = mbSerialBase.Get("version").GetValue().AsInt(),
                         baseTexture = null, //do later
-                        textureExt = textureExt,
+                        textures = new Dictionary<int, Bitmap>(), //same
+                        textureExts = textureExts,
                         sprites = new List<TkSpriteDefinition>()
                     };
                     collectionLookup[new AssetID(inst.name, mbInf.index)] = collection;
@@ -440,6 +471,9 @@ namespace sseadv
                     foreach (AssetTypeValueField def in spriteDefinitions.children)
                     {
                         bool flipped = def.Get("flipped").GetValue().AsInt() == 1;
+                        int materialId = def.Get("materialId").GetValue().AsInt();
+                        int textureWidth = textureWidths[materialId];
+                        int textureHeight = textureHeights[materialId];
 
                         double uxn = double.MaxValue;
                         double uxp = 0;
@@ -496,6 +530,7 @@ namespace sseadv
                             height = spriteHeight,
                             xOff = realX,
                             yOff = realY,
+                            materialId = materialId,
                             fullWidth = untrimmedBoundsData[1].Get("x").GetValue().AsFloat() / texelX,
                             fullHeight = untrimmedBoundsData[1].Get("y").GetValue().AsFloat() / texelY,
                             flipped = flipped
@@ -609,7 +644,7 @@ namespace sseadv
 
             using (Graphics graphics = Graphics.FromImage(croppedBitmap))
             {
-                graphics.DrawImage(col.baseTexture, new Rectangle(0, 0, def.width, def.height), new Rectangle(def.x, def.y, def.width, def.height), GraphicsUnit.Pixel);
+                graphics.DrawImage(GetTexture(col.textureExts[def.materialId]), new Rectangle(0, 0, def.width, def.height), new Rectangle(def.x, def.y, def.width, def.height), GraphicsUnit.Pixel);
             }
 
             Bitmap croppedBitmapGdiSafe;
@@ -657,7 +692,9 @@ namespace sseadv
                 }
 
                 graphics.DrawImage(croppedBitmapGdiSafe, drawX, drawY);
+                croppedBitmapGdiSafe.Dispose();
             }
+            def.cropCache = resizedBitmap;
             return resizedBitmap;
         }
 
