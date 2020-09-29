@@ -176,7 +176,7 @@ namespace sseadv
                 int counter = 0;
                 foreach (TkSpriteFrame frame in activeAnimation.frames)
                 {
-                    Bitmap croppedImage = GetBitmap(frame.collection.sprites[frame.spriteId], false, true, false);
+                    Bitmap croppedImage = GetBitmap(frame.collection.sprites[frame.spriteId], false, true, true);
                     croppedImage.Save(Path.Combine(saveFolder, $"{activeAnimation.name}_{counter.ToString().PadLeft(3, '0')}.png"));
                     counter++;
                 }
