@@ -46,7 +46,7 @@ namespace sseadv
                 TITLE_DEF += " [compat mode]";
 
             am = new AssetsManager();
-            am.LoadClassDatabase("cldb.dat");
+            am.LoadClassPackage("classdata.tpk");
             am.useTemplateFieldCache = true;
         }
 
@@ -114,6 +114,7 @@ namespace sseadv
                 return;
 
             AssetsFileInstance inst = am.LoadAssetsFile(Path.Combine(gameDataPath, "globalgamemanagers"), false);
+            am.LoadClassDatabaseFromPackage(inst.file.typeTree.unityVersion);
             AssetFileInfoEx buildSettings = inst.table.GetAssetInfo(11);
 
             List<string> scenes = new List<string>();
@@ -175,7 +176,7 @@ namespace sseadv
                 int counter = 0;
                 foreach (TkSpriteFrame frame in activeAnimation.frames)
                 {
-                    Bitmap croppedImage = GetBitmap(frame.collection.sprites[frame.spriteId], false, true, true);
+                    Bitmap croppedImage = GetBitmap(frame.collection.sprites[frame.spriteId], false, true, false);
                     croppedImage.Save(Path.Combine(saveFolder, $"{activeAnimation.name}_{counter.ToString().PadLeft(3, '0')}.png"));
                     counter++;
                 }
@@ -196,7 +197,8 @@ namespace sseadv
                 Bitmap baseTexture = activeCollection.sprites[0].parent.baseTexture;
                 //o boy, hope this is the right size
                 Bitmap canvas = new Bitmap(baseTexture.Width, baseTexture.Height);
-                foreach (TkSpriteDefinition sprite in activeCollection.sprites)
+                List<TkSpriteDefinition> sortedSpriteList = activeCollection.sprites.OrderBy(s => s.name).ToList();
+                foreach (TkSpriteDefinition sprite in sortedSpriteList)
                 {
                     string fileName = Path.Combine(saveFolder, $"{activeCollection.name}_{counter.ToString().PadLeft(3, '0')}.png");
                     SetBitmap(canvas, (Bitmap)Image.FromFile(fileName), sprite);
@@ -234,7 +236,10 @@ namespace sseadv
                 if (col.baseTexture == null)
                 {
                     Text = TITLE_DEF + " [loading texture...]";
-                    col.baseTexture = GetTexture(col.textureExts[0]);
+                    if (col.textureExts.Count > 0)
+                        col.baseTexture = GetTexture(col.textureExts[0]);
+                    else
+                        col.baseTexture = null;
                     Text = TITLE_DEF;
                 }
 
@@ -353,6 +358,10 @@ namespace sseadv
             if (activeFrame >= activeAnimation.frames.Count)
             {
                 activeFrame = activeAnimation.loopStart;
+                if (activeAnimation.loopStart >= activeAnimation.frames.Count)
+                {
+                    activeFrame = activeAnimation.frames.Count - 1;
+                }
             }
             framesList.SelectedIndex = activeFrame;
             frameSlider.Value = activeFrame;
@@ -386,6 +395,7 @@ namespace sseadv
             Text = TITLE_DEF + " [loading assets...]";
 
             activeFile = am.LoadAssetsFile(fileName, true);
+            am.LoadClassDatabaseFromPackage(activeFile.file.typeTree.unityVersion);
             am.UpdateDependencies();
 
             bitmapCache = new Dictionary<AssetID, Bitmap>();
@@ -414,7 +424,7 @@ namespace sseadv
             foreach (AssetFileInfoEx mbInf in inst.table.GetAssetsOfType(0x72))
             {
                 string scriptName = null;
-                ushort scriptIndex = inst.file.typeTree.unity5Types[mbInf.curFileTypeOrIndex].scriptIndex;
+                ushort scriptIndex = AssetHelper.GetScriptIndex(inst.file, mbInf);
                 if (tk2dSCid != -1 && scriptIndex == tk2dSCid)
                 {
                     scriptName = "tk2dSpriteCollectionData";
@@ -450,11 +460,31 @@ namespace sseadv
                     List<int> textureHeights = new List<int>();
                     for (int i = 0; i < textures.childrenCount; i++)
                     {
-                        AssetExternal textureExt = am.GetExtAsset(inst, mbSerialBase.Get("textures")[i]);
-                        AssetTypeValueField textureBase = textureExt.instance.GetBaseField();
-                        textureExts.Add(textureExt);
-                        textureWidths.Add(textureBase.Get("m_Width").GetValue().AsInt());
-                        textureHeights.Add(textureBase.Get("m_Height").GetValue().AsInt());
+                        AssetExternal textureExt = am.GetExtAsset(inst, mbSerialBase.Get("textures")[i], true);
+                        if (textureExt.info.curFileSize > 100000)
+                        {
+                            //bad news, unity probably stored the entire image into an array which is gonna
+                            //take up too much memory when we decode it, so we'll change the data to a byte array
+                            ClassDatabaseType textureType = AssetHelper.FindAssetClassByID(am.classFile, textureExt.info.curFileType);
+                            AssetTypeTemplateField textureTemp = new AssetTypeTemplateField();
+                            textureTemp.FromClassDatabase(am.classFile, textureType, 0);
+                            AssetTypeTemplateField image_data = textureTemp.children[textureTemp.childrenCount - 1];
+                            image_data.valueType = EnumValueTypes.ByteArray; //convert array to bytearray, much better
+                            AssetTypeInstance textureTypeInstance = new AssetTypeInstance(new[] { textureTemp }, inst.file.reader, textureExt.info.absoluteFilePos);
+                            AssetTypeValueField textureBase = textureTypeInstance.GetBaseField();
+                            textureExt.instance = textureTypeInstance;
+                            textureExts.Add(textureExt);
+                            textureWidths.Add(textureBase.Get("m_Width").GetValue().AsInt());
+                            textureHeights.Add(textureBase.Get("m_Height").GetValue().AsInt());
+                        }
+                        else
+                        {
+                            textureExt = am.GetExtAsset(inst, mbSerialBase.Get("textures")[i]);
+                            AssetTypeValueField textureBase = textureExt.instance.GetBaseField();
+                            textureExts.Add(textureExt);
+                            textureWidths.Add(textureBase.Get("m_Width").GetValue().AsInt());
+                            textureHeights.Add(textureBase.Get("m_Height").GetValue().AsInt());
+                        }
                     }
 
                     TkSpriteCollection collection = new TkSpriteCollection()
@@ -592,12 +622,18 @@ namespace sseadv
             {
                 foreach (AssetID parentId in animation.parentIds)
                 {
-                    animation.parents.Add(collectionLookup[parentId]);
+                    if (collectionLookup.ContainsKey(parentId))
+                    {
+                        animation.parents.Add(collectionLookup[parentId]);
+                    }
                 }
             }
             foreach (TkSpriteFrame frame in sprFrames)
             {
-                frame.collection = collectionLookup[frame.collectionId];
+                if (collectionLookup.ContainsKey(frame.collectionId))
+                {
+                    frame.collection = collectionLookup[frame.collectionId];
+                }
             }
         }
 
