@@ -2,6 +2,8 @@
 
 ![s](s.gif)
 
+[DOWNLOAD](https://github.com/nesrak1/sseadv/releases)
+
 this was only tested on hollow knight. I don't know if it works on other tk2d games.
 
 the plan was to get this working with regular unity sprites as well but I never added that when I made this.
