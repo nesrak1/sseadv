@@ -14,12 +14,15 @@ namespace sseadv
         public byte[] rawBytes;
         //public AssetExternal textureExt;
         public List<AssetExternal> textureExts;
+        public List<int> textureWidths;
+        public List<int> textureHeights;
         public List<TkSpriteDefinition> sprites;
+        public FileSpriteData baseFile;
 
         //for listview
         public override string ToString()
         {
-            return name;
+            return "   " + name;
         }
     }
 
@@ -141,6 +144,20 @@ namespace sseadv
         public static bool operator !=(AssetID idA, AssetID idB)
         {
             return !(idA == idB);
+        }
+    }
+
+    public class FileSpriteData
+    {
+        public List<TkSpriteCollection> collections;
+        public List<TkSpriteAnimation> animations;
+        public List<TkSpriteAnimationClip> animationClips;
+        public FileSpriteData() { }
+        public FileSpriteData(List<TkSpriteCollection> collections, List<TkSpriteAnimation> animations, List<TkSpriteAnimationClip> animationClips)
+        {
+            this.collections = collections;
+            this.animations = animations;
+            this.animationClips = animationClips;
         }
     }
 }

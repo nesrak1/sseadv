@@ -41,7 +41,7 @@
             this.sceneList.IntegralHeight = false;
             this.sceneList.Location = new System.Drawing.Point(0, 0);
             this.sceneList.Name = "sceneList";
-            this.sceneList.Size = new System.Drawing.Size(287, 523);
+            this.sceneList.Size = new System.Drawing.Size(320, 523);
             this.sceneList.TabIndex = 0;
             this.sceneList.DoubleClick += new System.EventHandler(this.sceneList_DoubleClick);
             // 
@@ -49,7 +49,7 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(287, 523);
+            this.ClientSize = new System.Drawing.Size(320, 523);
             this.Controls.Add(this.sceneList);
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.MaximizeBox = false;
