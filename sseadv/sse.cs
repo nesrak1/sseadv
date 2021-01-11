@@ -131,7 +131,7 @@ namespace sseadv
 
         private void closeAllToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            pictureBox = null;
+            pictureBox.Image = null;
             ResetUI();
 
             frameSlider.Value = 0;
@@ -1087,26 +1087,32 @@ namespace sseadv
 
         private void ClearTextures()
         {
-            foreach (TkSpriteCollection oldCol in activeSpriteData.collections)
+            if (activeSpriteData != null && activeSpriteData.collections != null)
             {
-                if (oldCol.baseTexture != null)
+                foreach (TkSpriteCollection oldCol in activeSpriteData.collections)
                 {
-                    oldCol.baseTexture.Dispose();
-                    oldCol.baseTexture = null;
-                }
-                if (oldCol.textures != null)
-                {
-                    foreach (var texture in oldCol.textures)
+                    if (oldCol.baseTexture != null)
                     {
-                        texture.Value.Dispose();
+                        oldCol.baseTexture.Dispose();
+                        oldCol.baseTexture = null;
+                    }
+                    if (oldCol.textures != null)
+                    {
+                        foreach (var texture in oldCol.textures)
+                        {
+                            texture.Value.Dispose();
+                        }
                     }
                 }
             }
-            foreach (var bitmap in bitmapCache)
+            if (bitmapCache != null)
             {
-                if (bitmap.Value != null)
+                foreach (var bitmap in bitmapCache)
                 {
-                    bitmap.Value.Dispose();
+                    if (bitmap.Value != null)
+                    {
+                        bitmap.Value.Dispose();
+                    }
                 }
             }
             bitmapCache = new Dictionary<AssetID, Bitmap>();
