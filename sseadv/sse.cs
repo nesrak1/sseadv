@@ -811,7 +811,7 @@ namespace sseadv
                         {
                             Bitmap newFile = (Bitmap)Image.FromFile(Path.Combine(saveFolder, spriteFile));
                             Bitmap oldFile = newTextures[def.materialId];
-                            EditCroppedSprite(oldFile, newFile, def);
+                            EditCroppedSprite(oldFile, newFile, def, true);
                         }
                         else
                         {
